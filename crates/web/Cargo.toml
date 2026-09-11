@@ -1,0 +1,51 @@
+[package]
+name = "etyloom-web"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "etyloom-web"
+path = "src/main.rs"
+required-features = ["ssr"]
+
+[dependencies]
+etyloom-core = { path = "../core" }
+serde.workspace = true
+serde_json.workspace = true
+leptos = "=0.8.20"
+leptos_router = "0.8"
+leptos_meta = "0.8"
+wasm-bindgen = { version = "0.2", optional = true }
+web-sys = { version = "0.3", features = ["Window", "Storage", "Document", "Element", "Location", "MediaQueryList"], optional = true }
+gloo-net = { version = "0.6", optional = true }
+gloo-timers = { version = "0.3", features = ["futures"], optional = true }
+console_error_panic_hook = { version = "0.1", optional = true }
+axum = { version = "0.8", features = ["macros"], optional = true }
+leptos_axum = { version = "0.8", optional = true }
+tokio = { version = "1", features = ["full"], optional = true }
+tower = { version = "0.5", features = ["util"], optional = true }
+tower-http = { version = "0.6", features = ["fs", "trace", "compression-gzip"], optional = true }
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "sqlite", "migrate", "macros"], optional = true }
+etyloom-engine = { path = "../engine", optional = true }
+anyhow = { version = "1", optional = true }
+thiserror = { version = "2", optional = true }
+tracing = { version = "0.1", optional = true }
+tracing-subscriber = { version = "0.3", features = ["env-filter"], optional = true }
+openidconnect = { version = "4", default-features = false, features = ["reqwest", "rustls-tls"], optional = true }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"], optional = true }
+getrandom = { version = "0.2", optional = true }
+blake3 = { workspace = true, optional = true }
+subtle = { version = "2", optional = true }
+url = { version = "2", optional = true }
+
+[features]
+default = []
+hydrate = ["leptos/hydrate", "dep:wasm-bindgen", "dep:web-sys", "dep:gloo-net", "dep:gloo-timers", "dep:console_error_panic_hook"]
+ssr = ["leptos/ssr", "leptos_router/ssr", "leptos_meta/ssr", "dep:leptos_axum", "dep:axum", "dep:tokio", "dep:tower", "dep:tower-http", "dep:sqlx", "dep:etyloom-engine", "dep:anyhow", "dep:thiserror", "dep:tracing", "dep:tracing-subscriber", "dep:openidconnect", "dep:reqwest", "dep:getrandom", "dep:blake3", "dep:subtle", "dep:url"]
+
+[dev-dependencies]
+tempfile = "3"

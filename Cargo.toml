@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/core", "crates/engine", "crates/cli"]
+members = ["crates/core", "crates/engine", "crates/cli", "crates/web"]
 resolver = "2"
 
 [workspace.package]
@@ -24,3 +24,20 @@ inherits = "release"
 opt-level = "z"
 lto = true
 panic = "abort"
+
+[[workspace.metadata.leptos]]
+name = "etyloom"
+bin-package = "etyloom-web"
+lib-package = "etyloom-web"
+output-name = "etyloom"
+site-root = "target/site"
+site-pkg-dir = "pkg"
+assets-dir = "crates/web/public"
+site-addr = "127.0.0.1:3000"
+reload-port = 3001
+bin-features = ["ssr"]
+bin-default-features = false
+lib-features = ["hydrate"]
+lib-default-features = false
+lib-profile-release = "wasm-release"
+end2end-cmd = "npx playwright test"

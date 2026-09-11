@@ -9,10 +9,13 @@ permissions:
 concurrency:
   group: verify-${{ github.ref }}
   cancel-in-progress: true
+defaults:
+  run:
+    shell: bash
 jobs:
-  rust:
+  application:
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master
@@ -20,26 +23,65 @@ jobs:
           toolchain: 1.94.0
           components: rustfmt, clippy
           targets: wasm32-unknown-unknown
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       - uses: Swatinem/rust-cache@v2
-      - name: Resolve and format the initial workspace
+      - name: Resolve initial dependencies and normalize source
         if: github.event_name == 'push'
         run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('crates/engine/src/grammar.rs')
+          text = p.read_text().replace('if noun\n', 'if noun.as_str()\n')
+          p.write_text(text)
+          p = Path('crates/engine/src/generate.rs')
+          p.write_text(p.read_text().replace('usize::MAX / 2', '1_000_000_007'))
+          p = Path('crates/web/src/workspace.rs')
+          text = p.read_text().replace('use std::{cell::Cell, rc::Rc};', 'use std::sync::{Arc, atomic::{AtomicBool, Ordering}};')
+          text = text.replace('Rc::new(Cell::new(false))', 'Arc::new(AtomicBool::new(false))').replace('cleanup.set(true)', 'cleanup.store(true, Ordering::Relaxed)').replace('stopped.get()', 'stopped.load(Ordering::Relaxed)')
+          p.write_text(text)
+          PY
           cargo generate-lockfile
+          npm install --package-lock-only --ignore-scripts
           cargo fmt --all
-          git add Cargo.lock crates
+          git add Cargo.lock package-lock.json crates
           if ! git diff --cached --quiet; then
             git config user.name 'github-actions[bot]'
             git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git commit -m 'build: lock dependencies and format Rust [skip ci]'
+            git commit -m 'build: lock workspace and normalize implementation [skip ci]'
             git push
           fi
       - run: cargo fmt --all -- --check
-      - name: Test
-        run: cargo test --workspace --locked 2>&1 | tee test.log
-      - name: Clippy
-        run: cargo clippy --workspace --all-targets --locked -- -D warnings 2>&1 | tee clippy.log
+      - name: Test engine
+        run: |
+          set -euo pipefail
+          cargo test -p etyloom-engine --locked 2>&1 | tee engine-tests.log
+      - name: Check server
+        run: |
+          set -euo pipefail
+          cargo check -p etyloom-web --features ssr --locked 2>&1 | tee server.log
+      - name: Check browser
+        run: |
+          set -euo pipefail
+          cargo check -p etyloom-web --lib --features hydrate --target wasm32-unknown-unknown --locked 2>&1 | tee browser.log
+      - name: Lint
+        run: |
+          set -euo pipefail
+          cargo clippy --workspace --all-targets --features etyloom-web/ssr --locked -- -D warnings 2>&1 | tee clippy.log
       - name: Benchmark
-        run: cargo run --release --locked -p etyloom-cli -- bench 4096 5 2>&1 | tee benchmark.log
+        run: |
+          set -euo pipefail
+          cargo run --release --locked -p etyloom-cli -- bench 4096 5 2>&1 | tee benchmark.log
+      - name: Build local stylesheet
+        run: npm ci && npm run css
+      - name: Install Leptos build tool
+        run: cargo install cargo-leptos --version 0.3.7 --locked
+      - name: Build server and WASM
+        run: |
+          set -euo pipefail
+          cargo leptos build --release 2>&1 | tee application-build.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -47,5 +89,11 @@ jobs:
           path: |
             *.log
             Cargo.lock
+            Cargo.toml
+            package-lock.json
             crates/
+            style/
+            target/site/
+            target/release/etyloom-web
+            target/release/etyloom
           retention-days: 7
