@@ -291,7 +291,7 @@ fn expand(recipe: &Recipe, grammar: &Grammar, entries: &mut Vec<Entry>) -> Resul
             }
             let id = format!("compound/{}/{}", modifier.id, head.id);
             let mut rng = Random::new(recipe, &id);
-            candidates.push((rng.below(usize::MAX / 2)?, id, modifier, head));
+            candidates.push((rng.below(1_000_000_007)?, id, modifier, head));
         }
     }
     candidates.sort_by(|a, b| (a.0, &a.1).cmp(&(b.0, &b.1)));

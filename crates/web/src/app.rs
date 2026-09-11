@@ -1,15 +1,26 @@
-use crate::{client, language::LanguagePage, workspace::{CreatePage, JobsPage, Workspace}};
+use crate::{
+    client,
+    language::LanguagePage,
+    workspace::{CreatePage, JobsPage, Workspace},
+};
 use etyloom_core::SessionInfo;
 use leptos::{prelude::*, task::spawn_local};
 use leptos_meta::{MetaTags, provide_meta_context};
-use leptos_router::{components::{A, Route, Router, Routes}, path};
+use leptos_router::{
+    components::{A, Route, Router, Routes},
+    path,
+};
 
 #[derive(Clone, Copy)]
 pub struct Session(pub RwSignal<Option<SessionInfo>>);
 
 impl Session {
     pub fn csrf(self) -> Result<String, String> {
-        self.0.get_untracked().filter(|s| s.authenticated).map(|s| s.csrf).ok_or_else(|| "Sign in to continue".into())
+        self.0
+            .get_untracked()
+            .filter(|s| s.authenticated)
+            .map(|s| s.csrf)
+            .ok_or_else(|| "Sign in to continue".into())
     }
 }
 
@@ -88,7 +99,9 @@ pub fn App() -> impl IntoView {
 
 #[component]
 pub fn Gate(children: ChildrenFn) -> impl IntoView {
-    let Some(session) = use_context::<Session>() else { return view! { <Notice message="The session context is missing. Reload the page.".into()/> }.into_any(); };
+    let Some(session) = use_context::<Session>() else {
+        return view! { <Notice message="The session context is missing. Reload the page.".into()/> }.into_any();
+    };
     view! {
         <Show when=move || session.0.get().is_some_and(|s| s.authenticated) fallback=move || {
             if session.0.get().is_none() { return view! { <div class="page loading" role="status">"Opening your workshop…"</div> }.into_any(); }
@@ -115,7 +128,10 @@ pub fn Notice(message: String) -> impl IntoView {
 fn ThemeToggle() -> impl IntoView {
     let current = RwSignal::new(String::from("light"));
     let error = RwSignal::new(None::<String>);
-    Effect::new(move |_| match client::theme(false) { Ok(value) => current.set(value), Err(message) => error.set(Some(message)) });
+    Effect::new(move |_| match client::theme(false) {
+        Ok(value) => current.set(value),
+        Err(message) => error.set(Some(message)),
+    });
     view! {
         <button class="theme-toggle quiet" aria-label="Toggle light and dark mode" title="Switch theme" on:click=move |_| {
             match client::theme(true) { Ok(value) => { current.set(value); error.set(None); }, Err(message) => error.set(Some(message)) }

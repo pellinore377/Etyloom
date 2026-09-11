@@ -1,8 +1,14 @@
-use crate::{app::{Gate, Notice, Session}, client};
+use crate::{
+    app::{Gate, Notice, Session},
+    client,
+};
 use etyloom_core::*;
 use leptos::{prelude::*, task::spawn_local};
 use leptos_router::components::A;
-use std::{cell::Cell, rc::Rc};
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
 
 #[component]
 pub fn Workspace() -> impl IntoView {
@@ -27,8 +33,11 @@ fn WorkspaceBody() -> impl IntoView {
                 projects.set(client::get("/api/projects").await?);
                 languages.set(client::get("/api/languages").await?);
                 Ok::<(), String>(())
-            }.await;
-            if let Err(message) = result { error.set(Some(message)); }
+            }
+            .await;
+            if let Err(message) = result {
+                error.set(Some(message));
+            }
             loading.set(false);
         });
     });
@@ -79,7 +88,9 @@ fn WorkspaceBody() -> impl IntoView {
 }
 
 #[component]
-pub fn CreatePage() -> impl IntoView { view! { <Gate><Creation/></Gate> } }
+pub fn CreatePage() -> impl IntoView {
+    view! { <Gate><Creation/></Gate> }
+}
 
 #[component]
 fn Creation() -> impl IntoView {
@@ -99,28 +110,66 @@ fn Creation() -> impl IntoView {
     let busy = RwSignal::new(false);
     let job = RwSignal::new(None::<Job>);
     let session = use_context::<Session>();
-    Effect::new(move |_| { spawn_local(async move {
-        match client::get::<Vec<Project>>("/api/projects").await {
-            Ok(values) => { if let Some(first) = values.first() { project.set(first.id.clone()); } projects.set(values); },
-            Err(message) => error.set(Some(message)),
-        }
-    }); });
+    Effect::new(move |_| {
+        spawn_local(async move {
+            match client::get::<Vec<Project>>("/api/projects").await {
+                Ok(values) => {
+                    if let Some(first) = values.first() {
+                        project.set(first.id.clone());
+                    }
+                    projects.set(values);
+                }
+                Err(message) => error.set(Some(message)),
+            }
+        });
+    });
     let submit = move |event: leptos::ev::SubmitEvent| {
         event.prevent_default();
         error.set(None);
-        let csrf = session.ok_or_else(|| "Session unavailable".to_string()).and_then(Session::csrf);
+        let csrf = session
+            .ok_or_else(|| "Session unavailable".to_string())
+            .and_then(Session::csrf);
         let result = (|| -> Result<Recipe, String> {
             if !recipe_json.get_untracked().trim().is_empty() {
-                return serde_json::from_str(&recipe_json.get_untracked()).map_err(|e| format!("Invalid generation recipe: {e}"));
+                return serde_json::from_str(&recipe_json.get_untracked())
+                    .map_err(|e| format!("Invalid generation recipe: {e}"));
             }
-            let morphology = match morphology.get_untracked().as_str() { "analytic" => Some(Morphology::Analytic), "suffixing" => Some(Morphology::Suffixing), "mixed" => Some(Morphology::Mixed), _ => None };
-            let order = match order.get_untracked().as_str() { "svo" => Some(Order::Svo), "sov" => Some(Order::Sov), "vso" => Some(Order::Vso), "vos" => Some(Order::Vos), "ovs" => Some(Order::Ovs), "osv" => Some(Order::Osv), _ => None };
+            let morphology = match morphology.get_untracked().as_str() {
+                "analytic" => Some(Morphology::Analytic),
+                "suffixing" => Some(Morphology::Suffixing),
+                "mixed" => Some(Morphology::Mixed),
+                _ => None,
+            };
+            let order = match order.get_untracked().as_str() {
+                "svo" => Some(Order::Svo),
+                "sov" => Some(Order::Sov),
+                "vso" => Some(Order::Vso),
+                "vos" => Some(Order::Vos),
+                "ovs" => Some(Order::Ovs),
+                "osv" => Some(Order::Osv),
+                _ => None,
+            };
             Ok(Recipe {
-                name: name.get_untracked(), seed: seed.get_untracked(), morphology, order,
-                sound: match sound.get_untracked().as_str() { "fluid" => SoundStyle::Fluid, "crisp" => SoundStyle::Crisp, _ => SoundStyle::Balanced },
-                lexicon_size: size.get_untracked().parse().map_err(|_| "Vocabulary size must be a number")?,
-                history_depth: depth.get_untracked().parse().map_err(|_| "History depth must be a number")?,
-                community: community.get_untracked(), notes: notes.get_untracked(), ..Recipe::default()
+                name: name.get_untracked(),
+                seed: seed.get_untracked(),
+                morphology,
+                order,
+                sound: match sound.get_untracked().as_str() {
+                    "fluid" => SoundStyle::Fluid,
+                    "crisp" => SoundStyle::Crisp,
+                    _ => SoundStyle::Balanced,
+                },
+                lexicon_size: size
+                    .get_untracked()
+                    .parse()
+                    .map_err(|_| "Vocabulary size must be a number")?,
+                history_depth: depth
+                    .get_untracked()
+                    .parse()
+                    .map_err(|_| "History depth must be a number")?,
+                community: community.get_untracked(),
+                notes: notes.get_untracked(),
+                ..Recipe::default()
             })
         })();
         match (csrf, result) {
@@ -131,12 +180,26 @@ fn Creation() -> impl IntoView {
                 spawn_local(async move {
                     let result = async {
                         if project_id.is_empty() {
-                            let new: Project = client::post("/api/projects", &serde_json::json!({"name": "My languages"}), &csrf).await?;
+                            let new: Project = client::post(
+                                "/api/projects",
+                                &serde_json::json!({"name": "My languages"}),
+                                &csrf,
+                            )
+                            .await?;
                             project_id = new.id;
                         }
-                        client::post::<Job,_>("/api/generate", &GenerateRequest { project_id, recipe }, &csrf).await
-                    }.await;
-                    match result { Ok(value) => job.set(Some(value)), Err(message) => error.set(Some(message)) }
+                        client::post::<Job, _>(
+                            "/api/generate",
+                            &GenerateRequest { project_id, recipe },
+                            &csrf,
+                        )
+                        .await
+                    }
+                    .await;
+                    match result {
+                        Ok(value) => job.set(Some(value)),
+                        Err(message) => error.set(Some(message)),
+                    }
                     busy.set(false);
                 });
             }
@@ -170,22 +233,32 @@ pub fn JobProgress(initial: Job) -> impl IntoView {
     let job = RwSignal::new(initial);
     let error = RwSignal::new(None::<String>);
     let session = use_context::<Session>();
-    let stopped = Rc::new(Cell::new(false));
+    let stopped = Arc::new(AtomicBool::new(false));
     let cleanup = stopped.clone();
-    on_cleanup(move || cleanup.set(true));
+    on_cleanup(move || cleanup.store(true, Ordering::Relaxed));
     Effect::new(move |_| {
         let stopped = stopped.clone();
         let id = job.get_untracked().id;
         spawn_local(async move {
-            while !stopped.get() {
+            while !stopped.load(Ordering::Relaxed) {
                 match client::get::<Job>(&format!("/api/jobs/{id}")).await {
                     Ok(value) => {
-                        let done = matches!(value.state.as_str(), "completed" | "failed" | "canceled");
-                        if stopped.get() { break; }
+                        let done =
+                            matches!(value.state.as_str(), "completed" | "failed" | "canceled");
+                        if stopped.load(Ordering::Relaxed) {
+                            break;
+                        }
                         job.set(value);
-                        if done { break; }
+                        if done {
+                            break;
+                        }
                     }
-                    Err(message) => { if !stopped.get() { error.set(Some(message)); } break; }
+                    Err(message) => {
+                        if !stopped.load(Ordering::Relaxed) {
+                            error.set(Some(message));
+                        }
+                        break;
+                    }
                 }
                 client::pause(1000).await;
             }
@@ -209,12 +282,21 @@ pub fn JobProgress(initial: Job) -> impl IntoView {
 }
 
 #[component]
-pub fn JobsPage() -> impl IntoView { view! { <Gate><Activity/></Gate> } }
+pub fn JobsPage() -> impl IntoView {
+    view! { <Gate><Activity/></Gate> }
+}
 
 #[component]
 fn Activity() -> impl IntoView {
     let jobs = RwSignal::new(Vec::<Job>::new());
     let error = RwSignal::new(None::<String>);
-    Effect::new(move |_| { spawn_local(async move { match client::get("/api/jobs").await { Ok(value) => jobs.set(value), Err(message) => error.set(Some(message)) } }); });
+    Effect::new(move |_| {
+        spawn_local(async move {
+            match client::get("/api/jobs").await {
+                Ok(value) => jobs.set(value),
+                Err(message) => error.set(Some(message)),
+            }
+        });
+    });
     view! { <section class="page"><p class="eyebrow">"WORKSHOP RECORD"</p><h1>"Activity."</h1><p class="intro">"Generation keeps its place, even when you leave the page."</p>{move || error.get().map(|message| view! { <Notice message/> })}{move || if jobs.get().is_empty() { view! { <p class="empty ruled">"No generation jobs yet."</p> }.into_any() } else { jobs.get().into_iter().map(|job| view! { <JobProgress initial=job/> }).collect_view().into_any() }}</section> }
 }

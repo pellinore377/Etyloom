@@ -1,11 +1,17 @@
-use crate::{app::{Gate, Notice, Session}, client, workspace::JobProgress};
+use crate::{
+    app::{Gate, Notice, Session},
+    client,
+    workspace::JobProgress,
+};
 use etyloom_core::*;
 use leptos::{prelude::*, task::spawn_local};
 use leptos_router::{components::A, hooks::use_params_map};
 use serde::Deserialize;
 
 #[component]
-pub fn LanguagePage() -> impl IntoView { view! { <Gate><LanguageBody/></Gate> } }
+pub fn LanguagePage() -> impl IntoView {
+    view! { <Gate><LanguageBody/></Gate> }
+}
 
 #[component]
 fn LanguageBody() -> impl IntoView {
@@ -23,8 +29,13 @@ fn LanguageBody() -> impl IntoView {
         error.set(None);
         spawn_local(async move {
             let result = client::get::<LanguageDetail>(&format!("/api/languages/{id}")).await;
-            if generation.is_disposed() || generation.get_untracked() != request { return; }
-            match result { Ok(value) => data.set(Some(value)), Err(message) => error.set(Some(message)) }
+            if generation.is_disposed() || generation.get_untracked() != request {
+                return;
+            }
+            match result {
+                Ok(value) => data.set(Some(value)),
+                Err(message) => error.set(Some(message)),
+            }
         });
     });
     view! {
@@ -93,8 +104,20 @@ fn LanguageView(language: LanguageDetail, section: String, reload: RwSignal<u32>
 fn Overview(language: LanguageDetail) -> impl IntoView {
     let id = language.summary.id.clone();
     let example = language.examples.first().cloned();
-    let vowel_list = language.inventory.iter().filter(|s| s.vowel()).map(|s| s.ipa()).collect::<Vec<_>>().join(" · ");
-    let consonants = language.inventory.iter().filter(|s| !s.vowel()).map(|s| s.ipa()).collect::<Vec<_>>().join(" · ");
+    let vowel_list = language
+        .inventory
+        .iter()
+        .filter(|s| s.vowel())
+        .map(|s| s.ipa())
+        .collect::<Vec<_>>()
+        .join(" · ");
+    let consonants = language
+        .inventory
+        .iter()
+        .filter(|s| !s.vowel())
+        .map(|s| s.ipa())
+        .collect::<Vec<_>>()
+        .join(" · ");
     view! {
         <div class="overview-grid">
             <div class="overview-main">
@@ -113,7 +136,11 @@ fn Overview(language: LanguageDetail) -> impl IntoView {
 }
 
 #[derive(Clone, Deserialize)]
-struct Words { entries: Vec<Entry>, total: usize, offset: usize }
+struct Words {
+    entries: Vec<Entry>,
+    total: usize,
+    offset: usize,
+}
 
 #[component]
 fn Lexicon(language: LanguageDetail) -> impl IntoView {
@@ -132,10 +159,20 @@ fn Lexicon(language: LanguageDetail) -> impl IntoView {
         let request = serial.get_untracked();
         let id = id.get_value();
         spawn_local(async move {
-            let result = client::get::<Words>(&format!("/api/languages/{id}/words?q={}&offset={start}",client::encode_query(&search))).await;
-            if serial.is_disposed() || serial.get_untracked() != request { return; }
+            let result = client::get::<Words>(&format!(
+                "/api/languages/{id}/words?q={}&offset={start}",
+                client::encode_query(&search)
+            ))
+            .await;
+            if serial.is_disposed() || serial.get_untracked() != request {
+                return;
+            }
             match result {
-                Ok(value) => { selected.set(value.entries.first().cloned()); words.set(Some(value)); error.set(None); },
+                Ok(value) => {
+                    selected.set(value.entries.first().cloned());
+                    words.set(Some(value));
+                    error.set(None);
+                }
                 Err(message) => error.set(Some(message)),
             }
         });
@@ -164,11 +201,19 @@ fn Lexicon(language: LanguageDetail) -> impl IntoView {
 
 #[component]
 fn Inspector(entry: Entry) -> impl IntoView {
-    let Some(current) = entry.forms.last().cloned() else { return view! { <Notice message="This entry has no readable forms.".into()/> }.into_any(); };
+    let Some(current) = entry.forms.last().cloned() else {
+        return view! { <Notice message="This entry has no readable forms.".into()/> }.into_any();
+    };
     let origin = match &entry.origin {
         Origin::Root => "Inherited root; generated in the ancestral stage.".into(),
-        Origin::Compound { modifier, head } => format!("Contemporary compound of {} + {}. Coined after the recorded sound changes.",modifier.trim_start_matches("n."),head.trim_start_matches("n.")),
-        Origin::Derivation { base, operation } => format!("Derived from {base} through {operation}."),
+        Origin::Compound { modifier, head } => format!(
+            "Contemporary compound of {} + {}. Coined after the recorded sound changes.",
+            modifier.trim_start_matches("n."),
+            head.trim_start_matches("n.")
+        ),
+        Origin::Derivation { base, operation } => {
+            format!("Derived from {base} through {operation}.")
+        }
         Origin::Loan { source, stage } => format!("Borrowed from {source} in stage {stage}."),
     };
     view! {
@@ -184,9 +229,15 @@ fn Inspector(entry: Entry) -> impl IntoView {
 fn GrammarView(language: LanguageDetail) -> impl IntoView {
     let grammar = language.grammar;
     let morphology = match grammar.morphology {
-        Morphology::Analytic => "Number, past and future are expressed with separate grammatical words. The noun or verb stem remains uninflected for those categories.",
-        Morphology::Suffixing => "Nouns and verbs carry inherited number and past paradigms. Future marking uses the contemporary suffix. Historical stem alternations and later regularization are stored per entry.",
-        Morphology::Mixed => "Number and past use inherited inflection, while future and modal constructions use separate grammatical words. Analogy affects a smaller cohort, preserving more inherited paradigms.",
+        Morphology::Analytic => {
+            "Number, past and future are expressed with separate grammatical words. The noun or verb stem remains uninflected for those categories."
+        }
+        Morphology::Suffixing => {
+            "Nouns and verbs carry inherited number and past paradigms. Future marking uses the contemporary suffix. Historical stem alternations and later regularization are stored per entry."
+        }
+        Morphology::Mixed => {
+            "Number and past use inherited inflection, while future and modal constructions use separate grammatical words. Analogy affects a smaller cohort, preserving more inherited paradigms."
+        }
     };
     view! {
         <div class="reference-layout"><nav class="reference-toc" aria-label="Grammar contents"><p class="eyebrow">"REFERENCE"</p><a href="#structure">"01 / Sentence structure"</a><a href="#morphology">"02 / Word formation"</a><a href="#operators">"03 / Scope & operators"</a><a href="#examples">"04 / Examples"</a><a href="#coverage">"05 / Current coverage"</a></nav><article class="grammar-reference">
@@ -261,9 +312,24 @@ fn Learn(language: LanguageDetail) -> impl IntoView {
     let session = use_context::<Session>();
     Effect::new(move |_| {
         let number = index.get();
-        let path = format!("/api/languages/{}/exercise?index={number}&revision={}",id.get_value(),revision.get_value());
-        feedback.set(None); answer.set(String::new()); exercise.set(None);
-        spawn_local(async move { let result = client::get(&path).await; if exercise.is_disposed() { return; } match result { Ok(value) => exercise.set(Some(value)), Err(message) => error.set(Some(message)) } });
+        let path = format!(
+            "/api/languages/{}/exercise?index={number}&revision={}",
+            id.get_value(),
+            revision.get_value()
+        );
+        feedback.set(None);
+        answer.set(String::new());
+        exercise.set(None);
+        spawn_local(async move {
+            let result = client::get(&path).await;
+            if exercise.is_disposed() {
+                return;
+            }
+            match result {
+                Ok(value) => exercise.set(Some(value)),
+                Err(message) => error.set(Some(message)),
+            }
+        });
     });
     view! {
         <div class="lesson-wrap"><div class="section-heading"><p class="eyebrow">"A LITTLE PRACTICE"</p><span class="small muted">{move || format!("EXERCISE {:02}",index.get()+1)}</span></div><h2>"Make the language yours."</h2><p class="intro">"Write the meaning below in "{language.summary.name}"."</p>
@@ -322,5 +388,13 @@ fn Settings(language: LanguageDetail) -> impl IntoView {
     }
 }
 
-fn short(value: &str) -> String { value.chars().take(10).collect() }
-fn category(value: Category) -> &'static str { match value { Category::Noun => "noun", Category::Verb => "verb", Category::Adjective => "adjective" } }
+fn short(value: &str) -> String {
+    value.chars().take(10).collect()
+}
+fn category(value: Category) -> &'static str {
+    match value {
+        Category::Noun => "noun",
+        Category::Verb => "verb",
+        Category::Adjective => "adjective",
+    }
+}

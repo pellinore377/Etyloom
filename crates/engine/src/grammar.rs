@@ -743,7 +743,7 @@ impl<'a> Runtime<'a> {
                 .filter(|e| e.category == Category::Noun)
             {
                 for plural in [false, true] {
-                    if noun
+                    if noun.as_str()
                         == if plural {
                             &entry.english.plural
                         } else {
