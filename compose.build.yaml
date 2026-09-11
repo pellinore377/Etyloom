@@ -1,0 +1,6 @@
+services:
+  etyloom:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: etyloom:local

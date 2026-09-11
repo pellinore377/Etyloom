@@ -27,30 +27,19 @@ jobs:
         with:
           node-version: '22'
       - uses: Swatinem/rust-cache@v2
-      - name: Resolve initial dependencies and normalize source
+        with:
+          cache-on-failure: true
+      - name: Normalize initial source
         if: github.event_name == 'push'
         run: |
           set -euo pipefail
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path('crates/engine/src/grammar.rs')
-          text = p.read_text().replace('if noun\n', 'if noun.as_str()\n')
-          p.write_text(text)
-          p = Path('crates/engine/src/generate.rs')
-          p.write_text(p.read_text().replace('usize::MAX / 2', '1_000_000_007'))
-          p = Path('crates/web/src/workspace.rs')
-          text = p.read_text().replace('use std::{cell::Cell, rc::Rc};', 'use std::sync::{Arc, atomic::{AtomicBool, Ordering}};')
-          text = text.replace('Rc::new(Cell::new(false))', 'Arc::new(AtomicBool::new(false))').replace('cleanup.set(true)', 'cleanup.store(true, Ordering::Relaxed)').replace('stopped.get()', 'stopped.load(Ordering::Relaxed)')
-          p.write_text(text)
-          PY
-          cargo generate-lockfile
-          npm install --package-lock-only --ignore-scripts
+          python3 .github/normalize.py
           cargo fmt --all
-          git add Cargo.lock package-lock.json crates
+          git add crates style
           if ! git diff --cached --quiet; then
             git config user.name 'github-actions[bot]'
             git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git commit -m 'build: lock workspace and normalize implementation [skip ci]'
+            git commit -m 'fix: preserve scope and normalize Rust source [skip ci]'
             git push
           fi
       - run: cargo fmt --all -- --check
@@ -59,18 +48,27 @@ jobs:
           set -euo pipefail
           cargo test -p etyloom-engine --locked 2>&1 | tee engine-tests.log
       - name: Check server
+        if: always()
         run: |
           set -euo pipefail
           cargo check -p etyloom-web --features ssr --locked 2>&1 | tee server.log
       - name: Check browser
+        if: always()
         run: |
           set -euo pipefail
           cargo check -p etyloom-web --lib --features hydrate --target wasm32-unknown-unknown --locked 2>&1 | tee browser.log
+      - name: Test server
+        if: always()
+        run: |
+          set -euo pipefail
+          cargo test -p etyloom-web --features ssr --locked 2>&1 | tee api-tests.log
       - name: Lint
+        if: always()
         run: |
           set -euo pipefail
           cargo clippy --workspace --all-targets --features etyloom-web/ssr --locked -- -D warnings 2>&1 | tee clippy.log
       - name: Benchmark
+        if: always()
         run: |
           set -euo pipefail
           cargo run --release --locked -p etyloom-cli -- bench 4096 5 2>&1 | tee benchmark.log
@@ -81,7 +79,12 @@ jobs:
       - name: Build server and WASM
         run: |
           set -euo pipefail
-          cargo leptos build --release 2>&1 | tee application-build.log
+          cargo leptos build 2>&1 | tee application-build.log
+      - name: Browser tests
+        run: |
+          set -euo pipefail
+          npx playwright install --with-deps chromium
+          npm run test:browser 2>&1 | tee browser-tests.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -94,6 +97,8 @@ jobs:
             crates/
             style/
             target/site/
-            target/release/etyloom-web
+            target/debug/etyloom-web
             target/release/etyloom
+            test-results/
+            playwright-report/
           retention-days: 7
