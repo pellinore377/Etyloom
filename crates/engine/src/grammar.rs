@@ -107,10 +107,7 @@ impl<'a> Runtime<'a> {
     }
 
     fn modal_first(&self) -> bool {
-        matches!(
-            self.package.grammar.order,
-            Order::Svo | Order::Vso | Order::Vos
-        )
+        !self.package.grammar.negation_after
     }
 
     fn entity(&self, entity: &Entity, object: bool) -> Result<Vec<String>> {

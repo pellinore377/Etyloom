@@ -1,3 +1,4 @@
+#[cfg(feature = "hydrate")]
 use etyloom_core::ApiError;
 use serde::{Serialize, de::DeserializeOwned};
 

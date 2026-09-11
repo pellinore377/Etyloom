@@ -345,7 +345,8 @@
   .mark { width: 27px; height: 33px; font-size: 22px; }
   .workspace-nav { gap: 14px; font-size: 12px; }
   .workspace-nav > a { padding: 23px 0; }
-  .workspace-nav > a:first-child,.theme-label,.account { display: none; }
+  .workspace-nav > a:first-child,.theme-label { display: none; }
+  .account { padding-left: 10px; font-size: 11px; }
   .theme-toggle { min-width: 30px; }
   .page-heading { display: block; padding-bottom: 30px; }
   .page-heading > .button { margin-top: 24px; }

@@ -129,7 +129,7 @@ fn Creation() -> impl IntoView {
         let csrf = session
             .ok_or_else(|| "Session unavailable".to_string())
             .and_then(Session::csrf);
-        let result = (|| -> Result<Recipe, String> {
+        let result = (|| -> std::result::Result<Recipe, String> {
             if !recipe_json.get_untracked().trim().is_empty() {
                 return serde_json::from_str(&recipe_json.get_untracked())
                     .map_err(|e| format!("Invalid generation recipe: {e}"));
