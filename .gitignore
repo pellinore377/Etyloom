@@ -1,0 +1,11 @@
+/target/
+/node_modules/
+/data/
+.env
+*.db
+*.db-shm
+*.db-wal
+*.log
+/playwright-report/
+/test-results/
+/services/neural/.venv/

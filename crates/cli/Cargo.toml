@@ -1,0 +1,14 @@
+[package]
+name = "etyloom-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "etyloom"
+path = "src/main.rs"
+
+[dependencies]
+etyloom-core = { path = "../core" }
+etyloom-engine = { path = "../engine" }
+serde_json.workspace = true
