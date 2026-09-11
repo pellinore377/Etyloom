@@ -5,7 +5,7 @@ on:
   pull_request:
   workflow_dispatch:
 permissions:
-  contents: write
+  contents: read
 concurrency:
   group: verify-${{ github.ref }}
   cancel-in-progress: true
@@ -29,86 +29,38 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-      - name: Normalize initial source
-        if: github.event_name == 'push'
-        run: |
-          set -euo pipefail
-          python3 .github/normalize.py
-          cargo clippy --fix --allow-dirty --allow-staged --workspace --all-targets --features etyloom-web/ssr --locked
-          cargo fmt --all
-          git add crates
-          if ! git diff --cached --quiet; then
-            git config user.name 'github-actions[bot]'
-            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git commit -m 'fix: preserve full paradigms, modal meanings and scoped UI tasks [skip ci]'
-            git push
-          fi
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/cargo-leptos
+          key: leptos-0.3.7-${{ runner.os }}-${{ runner.arch }}
       - run: cargo fmt --all -- --check
       - name: Test engine
-        if: always()
-        run: |
-          set -euo pipefail
-          cargo test -p etyloom-engine --locked 2>&1 | tee engine-tests.log
-      - name: Check server
-        if: always()
-        run: |
-          set -euo pipefail
-          cargo check -p etyloom-web --features ssr --locked 2>&1 | tee server.log
-      - name: Check browser
-        if: always()
-        run: |
-          set -euo pipefail
-          cargo check -p etyloom-web --lib --features hydrate --target wasm32-unknown-unknown --locked 2>&1 | tee browser.log
+        run: cargo test -p etyloom-engine --locked
       - name: Test server
-        if: always()
-        run: |
-          set -euo pipefail
-          cargo test -p etyloom-web --features ssr --locked 2>&1 | tee api-tests.log
+        run: cargo test -p etyloom-web --features ssr --locked
+      - name: Check browser
+        run: cargo check -p etyloom-web --lib --features hydrate --target wasm32-unknown-unknown --locked
       - name: Lint
-        if: always()
-        run: |
-          set -euo pipefail
-          cargo clippy --workspace --all-targets --features etyloom-web/ssr --locked -- -D warnings 2>&1 | tee clippy.log
+        run: cargo clippy --workspace --all-targets --features etyloom-web/ssr --locked -- -D warnings
       - name: Benchmark
-        if: always()
-        run: |
-          set -euo pipefail
-          cargo run --release --locked -p etyloom-cli -- bench 4096 5 2>&1 | tee benchmark.log
+        run: cargo run --release --locked -p etyloom-cli -- bench 4096 20
       - name: Build local stylesheet
-        if: always()
         run: npm ci && npm run css
       - name: Install Leptos build tool
-        if: always()
-        run: cargo install cargo-leptos --version 0.3.7 --locked
+        run: command -v cargo-leptos || cargo install cargo-leptos --version 0.3.7 --locked
       - name: Build server and WASM
-        if: always()
-        run: |
-          set -euo pipefail
-          cargo leptos build 2>&1 | tee application-build.log
+        run: cargo leptos build
       - name: Browser tests
-        if: always()
         run: |
-          set -euo pipefail
           npx playwright install --with-deps chromium
-          npm run test:browser 2>&1 | tee browser-tests.log
-      - name: Save source snapshot
-        if: always()
-        run: git archive --format=tar.gz -o source.tar.gz HEAD
+          npm run test:browser
+      - name: Require a clean checkout
+        run: git diff --exit-code
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: verification
           path: |
-            *.log
-            source.tar.gz
-            Cargo.lock
-            Cargo.toml
-            package-lock.json
-            crates/
-            style/
-            target/site/
-            target/debug/etyloom-web
-            target/release/etyloom
             test-results/
             playwright-report/
           retention-days: 7

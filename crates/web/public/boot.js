@@ -1,7 +1,7 @@
 import init, { hydrate } from '/pkg/etyloom.js';
 
 try {
-  await init({ module_or_path: '/pkg/etyloom_bg.wasm' });
+  await init({ module_or_path: '/pkg/etyloom.wasm' });
   hydrate();
 } catch (error) {
   console.error('Etyloom could not start its interface.', error);
