@@ -1,6 +1,9 @@
 use etyloom_core::{Error, Recipe, Result};
 
-pub struct Random { key: [u8; 32], counter: u64 }
+pub struct Random {
+    key: [u8; 32],
+    counter: u64,
+}
 
 impl Random {
     pub fn new(recipe: &Recipe, address: &str) -> Self {
@@ -9,8 +12,18 @@ impl Random {
         hash.update(recipe.seed.as_bytes());
         hash.update(&(address.len() as u64).to_le_bytes());
         hash.update(address.as_bytes());
-        hash.update(&recipe.rerolls.get(address).copied().unwrap_or_default().to_le_bytes());
-        Self { key: *hash.finalize().as_bytes(), counter: 0 }
+        hash.update(
+            &recipe
+                .rerolls
+                .get(address)
+                .copied()
+                .unwrap_or_default()
+                .to_le_bytes(),
+        );
+        Self {
+            key: *hash.finalize().as_bytes(),
+            counter: 0,
+        }
     }
 
     fn next(&mut self) -> u64 {
@@ -22,25 +35,37 @@ impl Random {
     }
 
     pub fn below(&mut self, bound: usize) -> Result<usize> {
-        if bound == 0 { return Err(Error::Invalid("Cannot sample an empty domain".into())); }
+        if bound == 0 {
+            return Err(Error::Invalid("Cannot sample an empty domain".into()));
+        }
         let bound = bound as u64;
         let threshold = bound.wrapping_neg() % bound;
         for _ in 0..128 {
             let value = self.next();
-            if value >= threshold { return Ok((value % bound) as usize); }
+            if value >= threshold {
+                return Ok((value % bound) as usize);
+            }
         }
         Err(Error::Budget)
     }
 
     pub fn pick<T: Clone>(&mut self, domain: &[T]) -> Result<T> {
-        domain.get(self.below(domain.len())?).cloned().ok_or(Error::Budget)
+        domain
+            .get(self.below(domain.len())?)
+            .cloned()
+            .ok_or(Error::Budget)
     }
 
     pub fn weighted<T: Clone>(&mut self, choices: &[(T, usize)]) -> Result<T> {
-        let total = choices.iter().try_fold(0usize, |n, (_, w)| n.checked_add(*w)).ok_or(Error::Budget)?;
+        let total = choices
+            .iter()
+            .try_fold(0usize, |n, (_, w)| n.checked_add(*w))
+            .ok_or(Error::Budget)?;
         let mut roll = self.below(total)?;
         for (choice, weight) in choices {
-            if roll < *weight { return Ok(choice.clone()); }
+            if roll < *weight {
+                return Ok(choice.clone());
+            }
             roll -= weight;
         }
         Err(Error::Budget)

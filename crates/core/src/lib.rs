@@ -111,19 +111,28 @@ impl Default for Recipe {
 impl Recipe {
     pub fn validate(&self) -> Result<()> {
         if self.schema != SCHEMA || self.engine != ENGINE || self.content != CONTENT {
-            return Err(Error::Version(format!("{}/{}/{}", self.schema, self.engine, self.content)));
+            return Err(Error::Version(format!(
+                "{}/{}/{}",
+                self.schema, self.engine, self.content
+            )));
         }
         if self.seed.is_empty() || self.seed.len() > 128 {
             return Err(Error::Invalid("Seed must contain 1–128 bytes".into()));
         }
         if self.name.trim().is_empty() || self.name.chars().count() > 80 {
-            return Err(Error::Invalid("Language name must contain 1–80 characters".into()));
+            return Err(Error::Invalid(
+                "Language name must contain 1–80 characters".into(),
+            ));
         }
         if !(128..=5000).contains(&self.lexicon_size) || !(1..=8).contains(&self.history_depth) {
-            return Err(Error::Invalid("Choose 128–5,000 entries and 1–8 historical stages".into()));
+            return Err(Error::Invalid(
+                "Choose 128–5,000 entries and 1–8 historical stages".into(),
+            ));
         }
         if self.community.len() > 240 || self.notes.len() > 8000 || self.rerolls.len() > 5000 {
-            return Err(Error::Invalid("Recipe metadata exceeds its size limit".into()));
+            return Err(Error::Invalid(
+                "Recipe metadata exceeds its size limit".into(),
+            ));
         }
         Ok(())
     }
@@ -132,31 +141,87 @@ impl Recipe {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[serde(rename_all = "snake_case")]
 pub enum Sound {
-    P, B, T, D, K, G, F, V, S, Z, Sh, Zh, M, N, Ng, L, R, Y, W, H,
-    A, E, I, O, U, Ae, Oe, Yv,
+    P,
+    B,
+    T,
+    D,
+    K,
+    G,
+    F,
+    V,
+    S,
+    Z,
+    Sh,
+    Zh,
+    M,
+    N,
+    Ng,
+    L,
+    R,
+    Y,
+    W,
+    H,
+    A,
+    E,
+    I,
+    O,
+    U,
+    Ae,
+    Oe,
+    Yv,
 }
 
 impl Sound {
     pub fn vowel(self) -> bool {
-        matches!(self, Self::A | Self::E | Self::I | Self::O | Self::U | Self::Ae | Self::Oe | Self::Yv)
+        matches!(
+            self,
+            Self::A | Self::E | Self::I | Self::O | Self::U | Self::Ae | Self::Oe | Self::Yv
+        )
     }
 
     pub fn ipa(self) -> &'static str {
         match self {
-            Self::P => "p", Self::B => "b", Self::T => "t", Self::D => "d",
-            Self::K => "k", Self::G => "ɡ", Self::F => "f", Self::V => "v",
-            Self::S => "s", Self::Z => "z", Self::Sh => "ʃ", Self::Zh => "ʒ",
-            Self::M => "m", Self::N => "n", Self::Ng => "ŋ", Self::L => "l",
-            Self::R => "r", Self::Y => "j", Self::W => "w", Self::H => "h",
-            Self::A => "a", Self::E => "e", Self::I => "i", Self::O => "o",
-            Self::U => "u", Self::Ae => "æ", Self::Oe => "ø", Self::Yv => "y",
+            Self::P => "p",
+            Self::B => "b",
+            Self::T => "t",
+            Self::D => "d",
+            Self::K => "k",
+            Self::G => "ɡ",
+            Self::F => "f",
+            Self::V => "v",
+            Self::S => "s",
+            Self::Z => "z",
+            Self::Sh => "ʃ",
+            Self::Zh => "ʒ",
+            Self::M => "m",
+            Self::N => "n",
+            Self::Ng => "ŋ",
+            Self::L => "l",
+            Self::R => "r",
+            Self::Y => "j",
+            Self::W => "w",
+            Self::H => "h",
+            Self::A => "a",
+            Self::E => "e",
+            Self::I => "i",
+            Self::O => "o",
+            Self::U => "u",
+            Self::Ae => "æ",
+            Self::Oe => "ø",
+            Self::Yv => "y",
         }
     }
 
     pub fn spelling(self) -> &'static str {
         match self {
-            Self::G => "g", Self::Y => "y", Self::Sh => "š", Self::Zh => "ž",
-            Self::Ng => "ŋ", Self::Oe => "ö", Self::Yv => "ü", _ => self.ipa(),
+            Self::G => "g",
+            Self::Y => "y",
+            Self::Sh => "š",
+            Self::Zh => "ž",
+            Self::Ng => "ŋ",
+            Self::Oe => "ö",
+            Self::Yv => "ü",
+            _ => self.ipa(),
         }
     }
 }
@@ -165,8 +230,12 @@ impl Sound {
 pub struct Form(pub Vec<Sound>);
 
 impl Form {
-    pub fn text(&self) -> String { self.0.iter().map(|s| s.spelling()).collect() }
-    pub fn ipa(&self) -> String { self.0.iter().map(|s| s.ipa()).collect() }
+    pub fn text(&self) -> String {
+        self.0.iter().map(|s| s.spelling()).collect()
+    }
+    pub fn ipa(&self) -> String {
+        self.0.iter().map(|s| s.ipa()).collect()
+    }
     pub fn joined(&self, other: &Self) -> Self {
         Self(self.0.iter().chain(&other.0).copied().collect())
     }
@@ -174,7 +243,11 @@ impl Form {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum Category { Noun, Verb, Adjective }
+pub enum Category {
+    Noun,
+    Verb,
+    Adjective,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct English {
@@ -216,7 +289,9 @@ pub struct Entry {
 
 impl Entry {
     pub fn current(&self) -> Result<&Paradigm> {
-        self.forms.last().ok_or_else(|| Error::Package(format!("{} has no forms", self.id)))
+        self.forms
+            .last()
+            .ok_or_else(|| Error::Package(format!("{} has no forms", self.id)))
     }
 }
 
@@ -249,27 +324,57 @@ pub struct Stage {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum Tense { Present, Past, Future }
+pub enum Tense {
+    Present,
+    Past,
+    Future,
+}
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum Modal { Want, Can, Must }
+pub enum Modal {
+    Want,
+    Can,
+    Must,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Entity {
-    Pronoun { person: u8, plural: bool },
-    Noun { id: String, plural: bool, adjective: Option<String> },
+    Pronoun {
+        person: u8,
+        plural: bool,
+    },
+    Noun {
+        id: String,
+        plural: bool,
+        adjective: Option<String>,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Meaning {
-    Event { subject: Entity, verb: String, object: Option<Entity>, tense: Tense },
-    Negation { body: Box<Meaning> },
-    Modal { modal: Modal, body: Box<Meaning> },
-    Question { body: Box<Meaning> },
-    Coordination { left: Box<Meaning>, right: Box<Meaning> },
+    Event {
+        subject: Entity,
+        verb: String,
+        object: Option<Entity>,
+        tense: Tense,
+    },
+    Negation {
+        body: Box<Meaning>,
+    },
+    Modal {
+        modal: Modal,
+        body: Box<Meaning>,
+    },
+    Question {
+        body: Box<Meaning>,
+    },
+    Coordination {
+        left: Box<Meaning>,
+        right: Box<Meaning>,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -352,10 +457,16 @@ pub struct Job {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GenerateRequest { pub project_id: String, pub recipe: Recipe }
+pub struct GenerateRequest {
+    pub project_id: String,
+    pub recipe: Recipe,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TranslationRequest { pub text: String, pub reverse: bool }
+pub struct TranslationRequest {
+    pub text: String,
+    pub reverse: bool,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Exercise {
@@ -366,10 +477,21 @@ pub struct Exercise {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AnswerRequest { pub exercise: usize, pub revision: String, pub answer: String }
+pub struct AnswerRequest {
+    pub exercise: usize,
+    pub revision: String,
+    pub answer: String,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Feedback { pub correct: bool, pub answer: String, pub explanation: String }
+pub struct Feedback {
+    pub correct: bool,
+    pub answer: String,
+    pub explanation: String,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ApiError { pub error: String, pub request_id: Option<String> }
+pub struct ApiError {
+    pub error: String,
+    pub request_id: Option<String>,
+}

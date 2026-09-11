@@ -1,7 +1,17 @@
 use etyloom_core::*;
-use etyloom_engine::{Runtime, generate, phonology::{self, Law}, verify_import};
+use etyloom_engine::{
+    Runtime, generate,
+    phonology::{self, Law},
+    verify_import,
+};
 
-fn recipe(seed: &str) -> Recipe { Recipe { seed: seed.into(), lexicon_size: 128, ..Recipe::default() } }
+fn recipe(seed: &str) -> Recipe {
+    Recipe {
+        seed: seed.into(),
+        lexicon_size: 128,
+        ..Recipe::default()
+    }
+}
 
 #[test]
 fn reproducible_package_and_recipe() -> Result<()> {
@@ -18,20 +28,52 @@ fn historical_alternation_is_executable() {
     let plural = Form(vec![T, A, K, I]);
     let fronted = phonology::apply(&plural, Law::IFronting);
     assert_eq!(fronted, Form(vec![T, Ae, K, I]));
-    assert_eq!(phonology::apply(&fronted, Law::FinalILoss), Form(vec![T, Ae, K]));
-    assert_eq!(phonology::apply(&Form(vec![N, I]), Law::FinalILoss), Form(vec![N, I]));
+    assert_eq!(
+        phonology::apply(&fronted, Law::FinalILoss),
+        Form(vec![T, Ae, K])
+    );
+    assert_eq!(
+        phonology::apply(&Form(vec![N, I]), Law::FinalILoss),
+        Form(vec![N, I])
+    );
 }
 
 #[test]
 fn all_orders_and_morphologies_round_trip() -> Result<()> {
-    for order in [Order::Svo, Order::Sov, Order::Vso, Order::Vos, Order::Ovs, Order::Osv] {
-        for morphology in [Morphology::Analytic, Morphology::Suffixing, Morphology::Mixed] {
-            let package = generate(Recipe { order: Some(order), morphology: Some(morphology), ..recipe("many-grammars") })?;
+    for order in [
+        Order::Svo,
+        Order::Sov,
+        Order::Vso,
+        Order::Vos,
+        Order::Ovs,
+        Order::Osv,
+    ] {
+        for morphology in [
+            Morphology::Analytic,
+            Morphology::Suffixing,
+            Morphology::Mixed,
+        ] {
+            let package = generate(Recipe {
+                order: Some(order),
+                morphology: Some(morphology),
+                ..recipe("many-grammars")
+            })?;
             let runtime = Runtime::new(&package)?;
-            for sentence in ["I see the river", "we walked", "I want to not walk", "I do not want to walk", "the small child sees the old tree", "I will see the rivers", "I see you and you see me"] {
+            for sentence in [
+                "I see the river",
+                "we walked",
+                "I want to not walk",
+                "I do not want to walk",
+                "the small child sees the old tree",
+                "I will see the rivers",
+                "I see you and you see me",
+            ] {
                 for meaning in runtime.interpret(sentence)? {
                     let rendered = runtime.realize(&meaning)?;
-                    assert!(runtime.analyze(&rendered)?.contains(&meaning), "{order} {morphology:?}: {sentence}");
+                    assert!(
+                        runtime.analyze(&rendered)?.contains(&meaning),
+                        "{order} {morphology:?}: {sentence}"
+                    );
                 }
             }
         }
@@ -54,8 +96,15 @@ fn negation_scope_is_not_collapsed() -> Result<()> {
 
 #[test]
 fn new_coinages_do_not_inherit_ancient_sound_laws() -> Result<()> {
-    let package = generate(Recipe { lexicon_size: 512, ..recipe("late-words") })?;
-    let late = package.lexicon.iter().find(|e| matches!(e.origin, Origin::Compound { .. })).ok_or(Error::Budget)?;
+    let package = generate(Recipe {
+        lexicon_size: 512,
+        ..recipe("late-words")
+    })?;
+    let late = package
+        .lexicon
+        .iter()
+        .find(|e| matches!(e.origin, Origin::Compound { .. }))
+        .ok_or(Error::Budget)?;
     assert_eq!(late.introduced, package.recipe.history_depth);
     assert_eq!(late.forms.len(), 1);
     assert_eq!(late.current()?.stage, package.recipe.history_depth);
@@ -82,8 +131,20 @@ fn mutation_breaks_package_checksum() -> Result<()> {
 
 #[test]
 fn recipe_budgets_are_enforced() {
-    assert!(generate(Recipe { lexicon_size: usize::MAX, ..recipe("too-big") }).is_err());
-    assert!(generate(Recipe { engine: "future/9".into(), ..recipe("future") }).is_err());
+    assert!(
+        generate(Recipe {
+            lexicon_size: usize::MAX,
+            ..recipe("too-big")
+        })
+        .is_err()
+    );
+    assert!(
+        generate(Recipe {
+            engine: "future/9".into(),
+            ..recipe("future")
+        })
+        .is_err()
+    );
 }
 
 #[test]
