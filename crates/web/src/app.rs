@@ -4,7 +4,7 @@ use crate::{
     workspace::{CreatePage, JobsPage, Workspace},
 };
 use etyloom_core::SessionInfo;
-use leptos::{prelude::*, task::spawn_local};
+use leptos::{prelude::*, task::spawn_local_scoped_with_cancellation as spawn_local};
 use leptos_meta::{MetaTags, provide_meta_context};
 use leptos_router::{
     components::{A, Route, Router, Routes},

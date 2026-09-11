@@ -66,7 +66,11 @@ impl<'a> Runtime<'a> {
                             .push((entry.id.clone(), Tense::Past));
                     }
                     if package.grammar.morphology == Morphology::Suffixing {
-                        let future = form.base.joined(marker(&package.grammar, "future")?).text();
+                        let future = form
+                            .future
+                            .as_ref()
+                            .ok_or_else(|| Error::Package("Missing future paradigm".into()))?
+                            .text();
                         runtime
                             .verbs
                             .entry(future)
@@ -167,16 +171,16 @@ impl<'a> Runtime<'a> {
         if plural {
             output.push(self.token("plural")?);
         }
-        if grammar.adjective_before {
-            if let Some(value) = &adjective {
-                output.push(value.clone());
-            }
+        if grammar.adjective_before
+            && let Some(value) = &adjective
+        {
+            output.push(value.clone());
         }
         output.push(head.text());
-        if !grammar.adjective_before {
-            if let Some(value) = adjective {
-                output.push(value);
-            }
+        if !grammar.adjective_before
+            && let Some(value) = adjective
+        {
+            output.push(value);
         }
         Ok(output)
     }
@@ -196,9 +200,12 @@ impl<'a> Runtime<'a> {
                     .ok_or_else(|| Error::Package("Missing past paradigm".into()))?
                     .text(),
             ]),
-            Tense::Future if grammar.morphology == Morphology::Suffixing => {
-                Ok(vec![form.base.joined(marker(grammar, "future")?).text()])
-            }
+            Tense::Future if grammar.morphology == Morphology::Suffixing => Ok(vec![
+                form.future
+                    .as_ref()
+                    .ok_or_else(|| Error::Package("Missing future paradigm".into()))?
+                    .text(),
+            ]),
             Tense::Past => Ok(vec![self.token("past")?, form.base.text()]),
             Tense::Future => Ok(vec![self.token("future")?, form.base.text()]),
         }
@@ -603,10 +610,14 @@ impl<'a> Runtime<'a> {
             }
             Meaning::Modal { modal, body } => {
                 let (subject, predicate) = self.english_predicate(body, true, depth + 1)?;
-                let verb = match modal { Modal::Want if !bare && third_singular(subject) => "wants to", Modal::Want => "want to", Modal::Can => "can", Modal::Must => "must" };
+                let verb = match modal { Modal::Want if !bare && third_singular(subject) => "wants to", Modal::Want => "want to", Modal::Can if bare => "be able to", Modal::Must if bare => "have to", Modal::Can => "can", Modal::Must => "must" };
                 Ok((subject, format!("{verb} {predicate}")))
             }
             Meaning::Negation { body } => {
+                if let Meaning::Modal { modal: Modal::Can, body: inner } = body.as_ref() && !bare {
+                    let (subject, predicate) = self.english_predicate(inner, true, depth + 1)?;
+                    return Ok((subject, format!("cannot {predicate}")));
+                }
                 if let Meaning::Event { subject, verb, object, tense } = body.as_ref() {
                     let event = Meaning::Event { subject: subject.clone(), verb: verb.clone(), object: object.clone(), tense: Tense::Present };
                     let (_, predicate) = self.english_predicate(&event, true, depth + 1)?;
@@ -774,6 +785,43 @@ impl<'a> Runtime<'a> {
         let Some(first) = words.first().map(String::as_str) else {
             return Ok(vec![]);
         };
+        if first == "cannot" {
+            return Ok(self
+                .english_parse_predicate(subject, &words[1..], Some(Tense::Present), depth + 1)?
+                .into_iter()
+                .map(|body| Meaning::Negation {
+                    body: Box::new(Meaning::Modal {
+                        modal: Modal::Can,
+                        body: Box::new(body),
+                    }),
+                })
+                .collect());
+        }
+        let ability = ["be", "am", "is", "are"].contains(&first)
+            && words.get(1).map(String::as_str) == Some("able")
+            && words.get(2).map(String::as_str) == Some("to");
+        let obligation =
+            ["have", "has"].contains(&first) && words.get(1).map(String::as_str) == Some("to");
+        if ability || obligation {
+            if forced.is_some_and(|tense| tense != Tense::Present) {
+                return Ok(vec![]);
+            }
+            let modal = if ability { Modal::Can } else { Modal::Must };
+            let offset = if ability { 3 } else { 2 };
+            return Ok(self
+                .english_parse_predicate(
+                    subject,
+                    &words[offset..],
+                    Some(Tense::Present),
+                    depth + 1,
+                )?
+                .into_iter()
+                .map(|body| Meaning::Modal {
+                    modal,
+                    body: Box::new(body),
+                })
+                .collect());
+        }
         if ["do", "does", "did", "will"].contains(&first) {
             let tense = if first == "did" {
                 Tense::Past

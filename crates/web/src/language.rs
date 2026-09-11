@@ -4,7 +4,7 @@ use crate::{
     workspace::JobProgress,
 };
 use etyloom_core::*;
-use leptos::{prelude::*, task::spawn_local};
+use leptos::{prelude::*, task::spawn_local_scoped_with_cancellation as spawn_local};
 use leptos_router::{components::A, hooks::use_params_map};
 use serde::Deserialize;
 
@@ -233,7 +233,7 @@ fn GrammarView(language: LanguageDetail) -> impl IntoView {
             "Number, past and future are expressed with separate grammatical words. The noun or verb stem remains uninflected for those categories."
         }
         Morphology::Suffixing => {
-            "Nouns and verbs carry inherited number and past paradigms. Future marking uses the contemporary suffix. Historical stem alternations and later regularization are stored per entry."
+            "Nouns and verbs carry inherited number and past paradigms. Future forms follow their inherited, historically developed paradigms. Historical stem alternations and later regularization are stored per entry."
         }
         Morphology::Mixed => {
             "Number and past use inherited inflection, while future and modal constructions use separate grammatical words. Analogy affects a smaller cohort, preserving more inherited paradigms."

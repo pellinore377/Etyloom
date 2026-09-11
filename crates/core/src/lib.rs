@@ -272,6 +272,8 @@ pub struct Paradigm {
     pub base: Form,
     pub plural: Option<Form>,
     pub past: Option<Form>,
+    #[serde(default)]
+    pub future: Option<Form>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

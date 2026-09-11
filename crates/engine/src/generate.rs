@@ -46,10 +46,12 @@ pub fn generate_with(
                 base: phonology::apply(&previous.base, law),
                 plural: previous.plural.as_ref().map(|f| phonology::apply(f, law)),
                 past: previous.past.as_ref().map(|f| phonology::apply(f, law)),
+                future: previous.future.as_ref().map(|f| phonology::apply(f, law)),
             };
             if form.base != previous.base
                 || form.plural != previous.plural
                 || form.past != previous.past
+                || form.future != previous.future
             {
                 affected += 1;
             }
@@ -83,11 +85,12 @@ pub fn generate_with(
                 } else {
                     6000
                 };
-                if entry.frequency < 4000 && rng.below(10000)? < threshold {
-                    if let Some(current) = entry.forms.last_mut() {
-                        current.plural = Some(current.base.joined(&suffix));
-                        count += 1;
-                    }
+                if entry.frequency < 4000
+                    && rng.below(10000)? < threshold
+                    && let Some(current) = entry.forms.last_mut()
+                {
+                    current.plural = Some(current.base.joined(&suffix));
+                    count += 1;
                 }
             }
             events.push(Event {
@@ -265,11 +268,17 @@ pub fn inflect(
     } else {
         None
     };
+    let future = if category == Category::Verb && grammar.morphology == Morphology::Suffixing {
+        Some(base.joined(marker(grammar, "future")?))
+    } else {
+        None
+    };
     Ok(Paradigm {
         stage,
         base,
         plural,
         past,
+        future,
     })
 }
 

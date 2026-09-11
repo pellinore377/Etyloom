@@ -42,6 +42,7 @@ pub fn validate(package: &Package) -> Result<()> {
             for form in std::iter::once(&paradigm.base)
                 .chain(paradigm.plural.iter())
                 .chain(paradigm.past.iter())
+                .chain(paradigm.future.iter())
             {
                 if form.0.is_empty() || form.0.len() > 128 || !form.0.iter().any(|s| s.vowel()) {
                     return Err(Error::Package(format!(
@@ -74,7 +75,12 @@ pub fn validate(package: &Package) -> Result<()> {
     let runtime = Runtime::new(package)?;
     for example in &package.examples {
         let sentence = runtime.realize(&example.meaning)?;
-        if sentence != example.text || !runtime.analyze(&sentence)?.contains(&example.meaning) {
+        if sentence != example.text
+            || !runtime.analyze(&sentence)?.contains(&example.meaning)
+            || !runtime
+                .interpret(&example.english)?
+                .contains(&example.meaning)
+        {
             return Err(Error::Package(
                 "An example does not round-trip through the grammar".into(),
             ));
