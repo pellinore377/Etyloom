@@ -15,6 +15,9 @@ pub fn generate_with(
     mut progress: impl FnMut(&str) -> Result<()>,
     canceled: impl Fn() -> bool,
 ) -> Result<Package> {
+    if recipe.engine == ENGINE {
+        return crate::evolution::generate_with(recipe, progress, canceled);
+    }
     recipe.validate()?;
     progress("Selecting compatible grammatical mechanisms")?;
     let sounds = phonology::inventory(&recipe)?;
@@ -25,6 +28,7 @@ pub fn generate_with(
         name: "Ancestral".into(),
         grammar: grammar.clone(),
         events: vec![],
+        metrics: None,
     }];
     progress("Ancestral vocabulary and paradigms are ready")?;
     for stage in 1..=recipe.history_depth {
@@ -107,6 +111,7 @@ pub fn generate_with(
             },
             grammar: grammar.clone(),
             events,
+            metrics: None,
         });
         progress(&format!(
             "Applied historical stage {stage} of {}",
@@ -157,7 +162,7 @@ pub fn marker<'a>(grammar: &'a Grammar, name: &str) -> Result<&'a Form> {
         .ok_or_else(|| Error::Package(format!("Missing marker {name}")))
 }
 
-fn grammar(recipe: &Recipe, sounds: &[Sound]) -> Result<Grammar> {
+pub(super) fn grammar(recipe: &Recipe, sounds: &[Sound]) -> Result<Grammar> {
     let mut rng = Random::new(recipe, "grammar/selection");
     let morphology = match recipe.morphology {
         Some(value) => value,
@@ -211,6 +216,7 @@ fn grammar(recipe: &Recipe, sounds: &[Sound]) -> Result<Grammar> {
         negation_after: rng.below(2)? == 0,
         markers,
         pronouns,
+        phonotactics: None,
     })
 }
 

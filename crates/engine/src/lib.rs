@@ -2,10 +2,14 @@
 
 pub mod content;
 pub mod corpus;
+pub mod evolution;
 pub mod generate;
 pub mod grammar;
+pub mod history;
 pub mod phonology;
+pub mod phonotactics;
 pub mod random;
+mod validation;
 
 use etyloom_core::*;
 pub use generate::{fingerprint, generate, generate_with};
@@ -72,6 +76,7 @@ pub fn validate(package: &Package) -> Result<()> {
             }
         }
     }
+    validation::development(package)?;
     let runtime = Runtime::new(package)?;
     for example in &package.examples {
         let sentence = runtime.realize(&example.meaning)?;

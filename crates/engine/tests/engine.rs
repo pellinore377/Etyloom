@@ -98,6 +98,7 @@ fn negation_scope_is_not_collapsed() -> Result<()> {
 fn new_coinages_do_not_inherit_ancient_sound_laws() -> Result<()> {
     let package = generate(Recipe {
         lexicon_size: 512,
+        engine: LEGACY_ENGINE.into(),
         ..recipe("late-words")
     })?;
     let late = package

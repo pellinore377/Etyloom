@@ -19,6 +19,38 @@ fn main() -> Result<(), Box<dyn Error>> {
             let language = generate(recipe)?;
             serde_json::to_writer_pretty(io::stdout().lock(), &language)?;
         }
+        Some("upgrade-recipe") => {
+            let path = args.get(1).ok_or("Provide a generation recipe path")?;
+            let mut recipe: Recipe = serde_json::from_slice(&fs::read(path)?)?;
+            recipe.upgrade()?;
+            serde_json::to_writer_pretty(io::stdout().lock(), &recipe)?;
+        }
+        Some("history") => {
+            let package = load(args.get(1))?;
+            for stage in &package.stages {
+                if let Some(counts) = &stage.metrics {
+                    println!(
+                        "stage={} inherited={} changed_entries={} changed_headwords={} introduced={} grammar_changes={}",
+                        stage.index,
+                        counts.inherited,
+                        counts.changed_paradigms,
+                        counts.changed_headwords,
+                        counts.introduced,
+                        counts.changed_grammar_forms
+                    );
+                } else {
+                    println!(
+                        "stage={} legacy_event_counts={:?}",
+                        stage.index,
+                        stage
+                            .events
+                            .iter()
+                            .map(|e| (&e.id, e.affected))
+                            .collect::<Vec<_>>()
+                    );
+                }
+            }
+        }
         Some("recipe") => {
             serde_json::to_writer_pretty(io::stdout().lock(), &Recipe::default())?;
         }
@@ -82,7 +114,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         _ => {
             writeln!(
                 io::stderr(),
-                "etyloom recipe | generate [recipe.json] | validate language.json | translate language.json 'English' | analyze language.json 'conlang' | corpus language.json [scenes] | bench [entries] [runs]"
+                "etyloom recipe | upgrade-recipe recipe.json | history language.json | generate [recipe.json] | validate language.json | translate language.json 'English' | analyze language.json 'conlang' | corpus language.json [scenes] | bench [entries] [runs]"
             )?;
         }
     }
