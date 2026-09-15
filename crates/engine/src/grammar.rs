@@ -2,6 +2,8 @@ use crate::generate::marker;
 use etyloom_core::*;
 use std::collections::BTreeMap;
 
+const MAX_ANALYSES: usize = 128;
+
 pub struct Runtime<'a> {
     pub package: &'a Package,
     entries: BTreeMap<&'a str, &'a Entry>,
@@ -1006,11 +1008,45 @@ fn object_english(text: &str) -> &str {
     }
 }
 fn add(output: &mut Vec<Meaning>, meaning: Meaning) -> Result<()> {
-    if !output.contains(&meaning) {
-        output.push(meaning);
+    if output.contains(&meaning) {
+        return Ok(());
     }
-    if output.len() > 32 {
+    if output.len() >= MAX_ANALYSES {
         return Err(Error::Budget);
     }
+    output.push(meaning);
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn event(index: usize) -> Meaning {
+        Meaning::Event {
+            subject: Entity::Pronoun {
+                person: 1,
+                plural: false,
+            },
+            verb: format!("verb-{index}"),
+            object: None,
+            tense: Tense::Present,
+        }
+    }
+
+    #[test]
+    fn ambiguity_is_bounded_without_truncating_or_counting_duplicates() -> Result<()> {
+        let mut output = Vec::new();
+        for index in 0..MAX_ANALYSES {
+            add(&mut output, event(index))?;
+        }
+        add(&mut output, event(0))?;
+        assert_eq!(output.len(), MAX_ANALYSES);
+        assert!(matches!(
+            add(&mut output, event(MAX_ANALYSES)),
+            Err(Error::Budget)
+        ));
+        assert_eq!(output.len(), MAX_ANALYSES);
+        Ok(())
+    }
 }
