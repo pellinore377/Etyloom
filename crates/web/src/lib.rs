@@ -4,6 +4,7 @@
 pub mod app;
 pub mod client;
 pub mod language;
+pub mod recipe;
 pub mod workspace;
 
 #[cfg(feature = "ssr")]
