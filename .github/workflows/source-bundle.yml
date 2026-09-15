@@ -1,0 +1,21 @@
+name: Source bundle
+on:
+  push:
+    branches: [work/roadmap-and-authoring]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: git archive --format=tar HEAD | zstd -T2 -o source.tar.zst
+      - uses: actions/upload-artifact@v4
+        with:
+          name: source-${{ github.sha }}
+          path: source.tar.zst
+          retention-days: 3
