@@ -12,10 +12,11 @@ This is an **early functional release**, not the completed research roadmap. The
 
 Implemented:
 
-- Addressed, deterministic randomness; versioned recipes and content checksums.
+- Addressed, deterministic randomness; versioned recipes and content checksums; exact legacy v0.1 replay and explicit upgrades to v0.2.
 - Six constituent orders, particle/suffix/mixed morphology, adjective placement, optional object case, pronouns and number.
 - Typed sentence meanings, tense, negation and modal scope, polar questions and coordination.
-- Generation of ancestral roots and complete inflected paradigms, five sound-change mechanisms, inherited alternations, frequency-biased analogy, and dated modern compounds.
+- Generation of ancestral roots and complete inflected paradigms, 14 effect-tested sound-change mechanisms, inherited alternations, frequency-biased analogy, and vocabulary introduced throughout the history.
+- Declared onset/coda profiles, boundary-aware syllable repair, and separately validated counts for inherited changes and new vocabulary.
 - 128–5,000 lexical entries. Large lexicons include **transparent generated compounds**, not thousands of curated independent root meanings.
 - Projects, persistent generation jobs, cancellation and recovery, drafts, immutable published revisions, exports and validated package import.
 - Grammar-backed bidirectional **controlled** translation. Unsupported input fails explicitly; alternative analyses remain visible.
@@ -23,7 +24,11 @@ Implemented:
 - Fieldnotes interface with brass accents, responsive layouts, and persistent light/dark themes.
 - Pocket ID sign-in, project authorization, database-backed sessions, CSRF checks, and non-root Docker deployment.
 
-Not implemented: unrestricted neural translation in the web app, language-family authoring, arbitrary custom history rules, rich contact/borrowing simulation, relative clauses, different-subject complements, aspect, possession, comparison, tone, pronunciation audio, or a complete adaptive curriculum. Community notes are reference material, not automatically interpreted generation inputs. See [coverage](docs/coverage.md).
+Not implemented: supplied-word pronunciation editing, unrestricted neural translation in the web app, language-family authoring, arbitrary custom history rules, rich contact/borrowing simulation, relative clauses, different-subject complements, aspect, possession, comparison, tone, pronunciation audio, or a complete adaptive curriculum. Community notes are reference material, not automatically interpreted generation inputs. See [coverage](docs/coverage.md).
+
+## Generator upgrade
+
+New languages use `etyloom/0.2.0`. Existing recipes keep their original engine so their results remain reproducible. To use the revised generator for a saved language, open **Recipe → Upgrade generator → Generate a new draft**. Published revisions are preserved. The [Roc regression report](docs/roc-regression.md) documents the repaired history behavior, tests and measured limits.
 
 ## Dockge deployment
 
@@ -68,6 +73,8 @@ Development sign-in exists only in **debug builds on loopback**. There is no rel
 cargo run -p etyloom-cli -- recipe > recipe.json
 cargo run -p etyloom-cli -- generate recipe.json > language.json
 cargo run -p etyloom-cli -- validate language.json
+cargo run -p etyloom-cli -- history language.json
+cargo run -p etyloom-cli -- upgrade-recipe recipe.json > upgraded-recipe.json
 cargo run -p etyloom-cli -- translate language.json 'I see the river'
 cargo run -p etyloom-cli -- corpus language.json 10000 > corpus.jsonl
 cargo run --release -p etyloom-cli -- bench 4096 20

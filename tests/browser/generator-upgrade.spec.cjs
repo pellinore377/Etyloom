@@ -1,0 +1,52 @@
+const { test, expect } = require('@playwright/test');
+const recipe = require('../../crates/engine/tests/fixtures/roc-v1.json');
+
+test('old recipe replay and explicit upgrade preserve a published revision', async ({ page }) => {
+  const failures = [];
+  page.on('pageerror', error => failures.push(error.message));
+  await page.goto('/auth/dev');
+  await expect(page.getByRole('heading', { name: 'The worktable.' })).toBeVisible();
+  await page.getByRole('link', { name: 'New language', exact: true }).click();
+  await page.locator('details.advanced > summary').click();
+  await page.getByLabel('Paste an exported recipe', { exact: true }).fill(JSON.stringify(recipe));
+  await page.getByRole('button', { name: 'Generate language', exact: false }).click();
+  await page.getByRole('link', { name: 'Open language →' }).click();
+  await expect(page.getByRole('heading', { name: 'Roc', exact: true })).toBeVisible();
+  const path = new URL(page.url()).pathname;
+  const id = path.split('/').at(-1);
+  const originalResponse = await page.request.get(`/api/languages/${id}/export`);
+  expect(originalResponse.ok()).toBeTruthy();
+  const original = await originalResponse.json();
+  expect(original.revision).toBe('08dcef8343f94d41f251452c9e0d805048b19802304689b0610b58506e39c133');
+  await page.getByRole('button', { name: 'Publish revision', exact: true }).click();
+  await expect(page.locator('.language-subtitle .status')).toHaveText('published');
+  await page.getByRole('link', { name: 'History', exact: true }).click();
+  await expect(page.getByText('Original generator revision', { exact: true })).toBeVisible();
+  await page.getByRole('link', { name: 'Recipe', exact: true }).click();
+  await expect(page.locator('#recipe-editor')).toHaveValue(/etyloom\/0\.1\.0/);
+  await page.getByRole('button', { name: 'Upgrade generator', exact: true }).click();
+  const upgraded = JSON.parse(await page.locator('#recipe-editor').inputValue());
+  expect(upgraded).toEqual({ ...recipe, engine: 'etyloom/0.2.0' });
+  await page.getByRole('button', { name: 'Generate a new draft →', exact: true }).click();
+  await page.getByRole('link', { name: 'Open language →' }).click();
+  await expect(page.locator('.context-strip')).toContainText('etyloom/0.2.0');
+  await expect(page.locator('.language-subtitle .status')).toHaveText('draft');
+  const updatedResponse = await page.request.get(`/api/languages/${id}/export`);
+  expect(updatedResponse.ok()).toBeTruthy();
+  const updated = await updatedResponse.json();
+  expect(updated.recipe.seed).toBe(recipe.seed);
+  expect(updated.lexicon).toHaveLength(5000);
+  expect(updated.revision).not.toBe(original.revision);
+  for (const stage of updated.stages.slice(6)) {
+    expect(stage.metrics.changed_paradigms).toBeGreaterThan(0);
+    expect(stage.metrics.inherited).toBeGreaterThan(3000);
+  }
+  await page.getByRole('link', { name: 'History', exact: true }).click();
+  await expect(page.locator('.stage-metrics')).toHaveCount(9);
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)).toBeFalsy();
+  const retained = await page.request.get(`/api/languages/${id}/exercise?revision=${original.revision}`);
+  expect(retained.ok()).toBeTruthy();
+  expect((await retained.json()).revision).toBe(original.revision);
+  expect(failures).toEqual([]);
+});

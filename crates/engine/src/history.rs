@@ -49,7 +49,11 @@ impl Rule {
         match self {
             Self::Voicing => phonology::describe(Law::IntervocalicVoicing),
             Self::Fronting => phonology::describe(Law::IFronting),
-            Self::EndingLoss => phonology::describe(Law::FinalILoss),
+            Self::EndingLoss => (
+                "final-i-loss",
+                "The old ending disappears",
+                "Final i is lost when another vowel remains. Earlier vowel alternations preserve evidence of the ending.",
+            ),
             Self::Devoicing => phonology::describe(Law::FinalDevoicing),
             Self::Spirantization => phonology::describe(Law::Spirantization),
             Self::Palatalization => (
@@ -110,6 +114,9 @@ impl Rule {
             Self::Spirantization => Some(Law::Spirantization),
             _ => None,
         };
+        if matches!(self, Self::EndingLoss) && form.0.iter().filter(|s| s.vowel()).count() < 2 {
+            return form.clone();
+        }
         if let Some(law) = basic {
             return phonology::apply(form, law);
         }
@@ -133,11 +140,13 @@ impl Rule {
                 }
             }
             let changed = match self {
-                Self::Palatalization if matches!(right, Some(E | I | Ae | Oe | Yv)) => match sound {
-                    K => Some(Sh),
-                    G => Some(Zh),
-                    _ => Some(sound),
-                },
+                Self::Palatalization if matches!(right, Some(E | I | Ae | Oe | Yv)) => {
+                    match sound {
+                        K => Some(Sh),
+                        G => Some(Zh),
+                        _ => Some(sound),
+                    }
+                }
                 Self::NasalAssimilation if sound == N => match right {
                     Some(P | B | M) => Some(M),
                     Some(K | G) => Some(Ng),
@@ -281,6 +290,17 @@ pub fn select(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ending_loss_preserves_the_only_syllable_nucleus() {
+        use Sound::*;
+        let single = Form(vec![K, R, I]);
+        assert_eq!(Rule::EndingLoss.apply(&single), single);
+        assert_eq!(
+            Rule::EndingLoss.apply(&Form(vec![T, A, K, I])),
+            Form(vec![T, A, K])
+        );
+    }
 
     #[test]
     fn palatalization_distinguishes_front_vowels_from_the_glide() {
