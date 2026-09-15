@@ -4,7 +4,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 pub const SCHEMA: u16 = 1;
-pub const ENGINE: &str = "etyloom/0.1.0";
+pub const ENGINE: &str = "etyloom/0.2.0";
+pub const LEGACY_ENGINE: &str = "etyloom/0.1.0";
 pub const CONTENT: &str = "editorial/0.1.0";
 
 #[derive(Debug, thiserror::Error)]
@@ -109,8 +110,17 @@ impl Default for Recipe {
 }
 
 impl Recipe {
+    pub fn upgrade(&mut self) -> Result<()> {
+        self.validate()?;
+        self.engine = ENGINE.into();
+        Ok(())
+    }
+
     pub fn validate(&self) -> Result<()> {
-        if self.schema != SCHEMA || self.engine != ENGINE || self.content != CONTENT {
+        if self.schema != SCHEMA
+            || !matches!(self.engine.as_str(), ENGINE | LEGACY_ENGINE)
+            || self.content != CONTENT
+        {
             return Err(Error::Version(format!(
                 "{}/{}/{}",
                 self.schema, self.engine, self.content
@@ -306,6 +316,26 @@ pub struct Grammar {
     pub negation_after: bool,
     pub markers: BTreeMap<String, Form>,
     pub pronouns: BTreeMap<String, Form>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub phonotactics: Option<Phonotactics>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Phonotactics {
+    pub onsets: Vec<Vec<Sound>>,
+    pub codas: Vec<Sound>,
+    pub linker: Sound,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct StageMetrics {
+    pub inherited: usize,
+    pub introduced: usize,
+    pub changed_headwords: usize,
+    pub changed_paradigms: usize,
+    pub changed_grammar_forms: usize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -322,6 +352,8 @@ pub struct Stage {
     pub name: String,
     pub grammar: Grammar,
     pub events: Vec<Event>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metrics: Option<StageMetrics>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]

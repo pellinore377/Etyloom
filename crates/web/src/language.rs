@@ -90,7 +90,7 @@ fn LanguageView(language: LanguageDetail, section: String, reload: RwSignal<u32>
                 }
             }>"Publish revision"</button> })}
         </div></div>
-        <div class="context-strip"><span>"SEED "<code>{language.summary.seed.clone()}</code></span><span title=revision.clone()>"REVISION "<code>{short(&revision)}</code></span><span>"HISTORICAL STAGE "<strong>"Contemporary"</strong></span></div>
+        <div class="context-strip"><span>"ENGINE "<code>{language.recipe.engine.clone()}</code></span><span>"SEED "<code>{language.summary.seed.clone()}</code></span><span title=revision.clone()>"REVISION "<code>{short(&revision)}</code></span><span>"HISTORICAL STAGE "<strong>"Contemporary"</strong></span></div>
         <nav class="language-nav" aria-label="Language sections">{[("overview","Overview"),("lexicon","Lexicon"),("grammar","Grammar"),("history","History"),("translate","Translate"),("learn","Learn"),("settings","Recipe")].into_iter().map(|(key,label)| {
             let href = if key == "overview" { format!("/languages/{id}") } else { format!("/languages/{id}/{key}") };
             view! { <A href attr:class=if key == section { "selected" } else { "" }>{label}</A> }
@@ -207,9 +207,10 @@ fn Inspector(entry: Entry) -> impl IntoView {
     let origin = match &entry.origin {
         Origin::Root => "Inherited root; generated in the ancestral stage.".into(),
         Origin::Compound { modifier, head } => format!(
-            "Contemporary compound of {} + {}. Coined after the recorded sound changes.",
+            "Compound of {} + {}, introduced in historical stage {}. Only later sound changes apply.",
             modifier.trim_start_matches("n."),
-            head.trim_start_matches("n.")
+            head.trim_start_matches("n."),
+            entry.introduced
         ),
         Origin::Derivation { base, operation } => {
             format!("Derived from {base} through {operation}.")
@@ -228,6 +229,7 @@ fn Inspector(entry: Entry) -> impl IntoView {
 #[component]
 fn GrammarView(language: LanguageDetail) -> impl IntoView {
     let grammar = language.grammar;
+    let syllables = grammar.phonotactics.clone();
     let morphology = match grammar.morphology {
         Morphology::Analytic => {
             "Number, past and future are expressed with separate grammatical words. The noun or verb stem remains uninflected for those categories."
@@ -243,6 +245,7 @@ fn GrammarView(language: LanguageDetail) -> impl IntoView {
         <div class="reference-layout"><nav class="reference-toc" aria-label="Grammar contents"><p class="eyebrow">"REFERENCE"</p><a href="#structure">"01 / Sentence structure"</a><a href="#morphology">"02 / Word formation"</a><a href="#operators">"03 / Scope & operators"</a><a href="#examples">"04 / Examples"</a><a href="#coverage">"05 / Current coverage"</a></nav><article class="grammar-reference">
             <section id="structure"><p class="eyebrow">"01 / SENTENCE STRUCTURE"</p><h2>"The shape of a sentence."</h2><p>{format!("The default constituent order is {}. Each clause links a subject to a verb and, when required by that verb, an object.",grammar.order)}</p><div class="grammar-facts"><p>{if grammar.adjective_before { "Adjectives precede the noun they modify." } else { "Adjectives follow the noun they modify." }}</p><p>{if grammar.case_marking { "Objects receive a bound case suffix on their noun or pronoun head." } else { "Grammatical roles are identified by constituent order, without an object-case suffix." }}</p></div></section>
             <section id="morphology"><p class="eyebrow">"02 / WORD FORMATION"</p><h2>"Patterns and their inheritances."</h2><p>{morphology}</p><p>"Current inflected forms are shown in the lexicon. Do not reconstruct them by attaching an ancestral ending: historical changes apply to complete paradigms."</p><table><caption>"Contemporary grammatical markers"</caption><thead><tr><th>"Function"</th><th>"Written form"</th><th>"Segmental IPA"</th></tr></thead><tbody>{grammar.markers.into_iter().filter(|(key,_)| key != "renewed_plural").map(|(key,form)| view! { <tr><td>{key}</td><td class="serif">{form.text()}</td><td class="ipa">"/"{form.ipa()}"/"</td></tr> }).collect_view()}</tbody></table></section>
+            {syllables.map(|profile| view! { <section id="syllables"><p class="eyebrow">"SYLLABLE STRUCTURE"</p><h2>"Sounds that fit together."</h2><p>"This profile is checked across roots, compounds, inflections and historical forms. ŋ is coda-only; repeated consonants at a boundary are separated rather than silently forming a geminate."</p><dl class="forms-list"><div><dt>"Repair vowel"</dt><dd class="ipa">{format!("/{}/",profile.linker.ipa())}</dd></div><div><dt>"Permitted codas"</dt><dd class="ipa">{profile.codas.iter().map(|s| s.ipa()).collect::<Vec<_>>().join(" · ")}</dd></div><div><dt>"Onset clusters"</dt><dd class="ipa">{profile.onsets.iter().filter(|c| c.len()>1).map(|c| c.iter().map(|s| s.ipa()).collect::<String>()).collect::<Vec<_>>().join(" · ")}</dd></div></dl><p class="field-help">"An empty cluster list means syllables have at most one onset consonant. These are this generator’s declared constraints, not universal rules for natural languages."</p></section> })}
             <section id="operators"><p class="eyebrow">"03 / SCOPE & OPERATORS"</p><h2>"Meaning is in the order, too."</h2><p>{if grammar.negation_after { "The negative marker follows the expression it negates." } else { "The negative marker precedes the expression it negates." }}</p><p>"Negating a desire is distinct from desiring a negative action. Modal, negative and question constructions wrap a typed meaning rather than substituting individual English words."</p><div class="example-note"><p>"I do not want to walk."</p><p>"I want to not walk."</p><small>"Two different meanings. The translator preserves the distinction."</small></div></section>
             <section id="examples"><p class="eyebrow">"04 / GENERATED EXAMPLES"</p><h2>"In practice."</h2>{language.examples.into_iter().map(|example| view! { <div class="reference-example"><p>{example.text}</p><span>{example.english}</span><small>{example.skill}</small></div> }).collect_view()}</section>
             <section id="coverage"><p class="eyebrow">"05 / COVERAGE"</p><h2>"What this release can say."</h2><ul>{language.limitations.into_iter().map(|line| view! { <li>{line}</li> }).collect_view()}</ul></section>
@@ -253,10 +256,12 @@ fn GrammarView(language: LanguageDetail) -> impl IntoView {
 #[component]
 fn History(language: LanguageDetail) -> impl IntoView {
     view! {
+        {(language.recipe.engine == LEGACY_ENGINE).then(|| view! { <aside class="notice"><strong>"Original generator revision"</strong><p>"This saved history is unchanged. Use Upgrade generator in Recipe, then generate a new draft to apply the revised engine."</p></aside> })}
         <div class="history-heading"><p class="eyebrow">"THE RECORDED DEVELOPMENT"</p><h2>"Nothing begins"<br/><em>"quite as it ends."</em></h2><p>"These events were executed on the language’s forms and paradigms. They are not a separately generated story."</p></div>
         <div class="history-timeline">{language.stages.into_iter().map(|stage| view! {
             <section class="history-stage"><div class="stage-marker"><span>{format!("{:02}",stage.index)}</span><i></i></div><div class="stage-body"><p class="eyebrow">"HISTORICAL STAGE"</p><h2>{stage.name}</h2>
-                {if stage.events.is_empty() { view! { <p>"The initial inventory, vocabulary and executable grammar establish the starting point. This is a functioning ancestor, not a list of roots without syntax."</p> }.into_any() } else { stage.events.into_iter().map(|event| view! { <div class="historical-event"><h3>{event.title}</h3><p>{event.description}</p><p class="event-count">{event.affected}" lexical entries affected"</p></div> }).collect_view().into_any() }}
+                {stage.metrics.map(|counts| view! { <dl class="stage-metrics grid grid-cols-2 gap-4 border-y border-line py-4 lg:grid-cols-5"><div><dt class="text-xs">"Inherited entries"</dt><dd class="mt-1 text-2xl tabular-nums">{counts.inherited}</dd></div><div><dt class="text-xs">"Entries changed"</dt><dd class="mt-1 text-2xl tabular-nums">{counts.changed_paradigms}</dd></div><div><dt class="text-xs">"Headwords changed"</dt><dd class="mt-1 text-2xl tabular-nums">{counts.changed_headwords}</dd></div><div><dt class="text-xs">"Entries introduced"</dt><dd class="mt-1 text-2xl tabular-nums">{counts.introduced}</dd></div><div><dt class="text-xs">"Grammar forms changed"</dt><dd class="mt-1 text-2xl tabular-nums">{counts.changed_grammar_forms}</dd></div></dl><p class="field-help">"Entries changed counts each inherited entry once, including inflection-only changes. New vocabulary is counted separately."</p> })}
+                {if stage.events.is_empty() { view! { <p>"The initial inventory, vocabulary and executable grammar establish the starting point. This is a functioning ancestor, not a list of roots without syntax."</p> }.into_any() } else { stage.events.into_iter().map(|event| view! { <div class="historical-event"><h3>{event.title}</h3><p>{event.description}</p><p class="event-count">{event.affected}{if event.id == "lexical-introduction" || event.id == "lexical-expansion" { " entries introduced" } else { " inherited entries affected by this event" }}</p></div> }).collect_view().into_any() }}
                 <details class="stage-grammar"><summary>"Grammar at this stage"</summary><p>{format!("Order: {} · morphology: {:?} · object case: {}",stage.grammar.order,stage.grammar.morphology,if stage.grammar.case_marking { "marked" } else { "unmarked" })}</p><dl class="forms-list">{stage.grammar.markers.into_iter().map(|(key,form)| view! { <div><dt>{key}</dt><dd>{form.text()}</dd></div> }).collect_view()}</dl></details>
             </div></section>
         }).collect_view()}</div><aside class="notice"><strong>"History is not a revision number."</strong><p>"A historical stage is part of the language’s fictional development. Publishing saves your authored version of that entire history."</p></aside>
@@ -369,6 +374,10 @@ fn Settings(language: LanguageDetail) -> impl IntoView {
         <div class="reference-narrow"><p class="eyebrow">"PRESERVE THE THREAD"</p><h2>"The recipe behind the language."</h2><p>"The seed, generation settings and exact engine version form a reproducible recipe. Changing it creates a new draft; a published revision is never rewritten."</p><div class="download-links"><a class="button secondary" href=format!("/api/languages/{}/recipe",id.get_value()) download>"Export recipe ↓"</a><a class="button secondary" href=format!("/api/languages/{}/export",id.get_value()) download>"Export complete language ↓"</a></div>
             {move || error.get().map(|message| view! { <Notice message/> })}
             {move || job.get().map(|value| view! { <JobProgress initial=value/> })}
+            <button class="button secondary small-button" type="button" disabled=move || busy.get() || job.get().is_some() on:click=move |_| {
+                let updated = (|| -> etyloom_core::Result<String> { let mut recipe: Recipe = serde_json::from_str(&source.get_untracked())?; recipe.upgrade()?; Ok(serde_json::to_string_pretty(&recipe)?) })();
+                match updated { Ok(value) => { source.set(value); error.set(None); }, Err(message) => error.set(Some(message.to_string())) }
+            }>"Upgrade generator"</button><p class="field-help">"Changes the recipe to the current generator. Review it, then generate a new draft. The same seed produces a different language under a different generator version; published revisions stay intact."</p>
             <form on:submit=move |event| {
                 event.prevent_default(); error.set(None);
                 let recipe = serde_json::from_str::<Recipe>(&source.get_untracked()).map_err(|e| format!("Invalid recipe: {e}"));
