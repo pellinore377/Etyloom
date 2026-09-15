@@ -1,6 +1,7 @@
 use crate::{
     app::{Gate, Notice, Session},
     client,
+    recipe::GeneratorStatus,
     workspace::JobProgress,
 };
 use etyloom_core::*;
@@ -371,13 +372,12 @@ fn Settings(language: LanguageDetail) -> impl IntoView {
     let job = RwSignal::new(None::<Job>);
     let session = use_context::<Session>();
     view! {
-        <div class="reference-narrow"><p class="eyebrow">"PRESERVE THE THREAD"</p><h2>"The recipe behind the language."</h2><p>"The seed, generation settings and exact engine version form a reproducible recipe. Changing it creates a new draft; a published revision is never rewritten."</p><div class="download-links"><a class="button secondary" href=format!("/api/languages/{}/recipe",id.get_value()) download>"Export recipe ↓"</a><a class="button secondary" href=format!("/api/languages/{}/export",id.get_value()) download>"Export complete language ↓"</a></div>
+        <div class="reference-narrow"><p class="eyebrow">"PRESERVE THE THREAD"</p><h2>"The recipe behind the language."</h2><p>"The seed, generation settings and exact engine version form a reproducible recipe. Changing it creates a new draft; a published revision is never rewritten."</p><div class="download-links"><a class="button secondary" href=format!("/api/languages/{}/recipe",id.get_value()) download>"Export saved recipe ↓"</a><a class="button secondary" href=format!("/api/languages/{}/export",id.get_value()) download>"Export complete language ↓"</a></div>
             {move || error.get().map(|message| view! { <Notice message/> })}
             {move || job.get().map(|value| view! { <JobProgress initial=value/> })}
-            <button class="button secondary small-button" type="button" disabled=move || busy.get() || job.get().is_some() on:click=move |_| {
-                let updated = (|| -> etyloom_core::Result<String> { let mut recipe: Recipe = serde_json::from_str(&source.get_untracked())?; recipe.upgrade()?; Ok(serde_json::to_string_pretty(&recipe)?) })();
-                match updated { Ok(value) => { source.set(value); error.set(None); }, Err(message) => error.set(Some(message.to_string())) }
-            }>"Upgrade generator"</button><p class="field-help">"Changes the recipe to the current generator. Review it, then generate a new draft. The same seed produces a different language under a different generator version; published revisions stay intact."</p>
+            <Show when=move || job.get().is_none() fallback=|| view! { <p class="field-help" role="status">"Generation submitted. Open the completed result above to view its saved generator version. This page still shows the previous revision."</p> }>
+                <GeneratorStatus source error saved=language.recipe.clone() disabled=Signal::derive(move || busy.get())/>
+            </Show>
             <form on:submit=move |event| {
                 event.prevent_default(); error.set(None);
                 let recipe = serde_json::from_str::<Recipe>(&source.get_untracked()).map_err(|e| format!("Invalid recipe: {e}"));
@@ -391,7 +391,7 @@ fn Settings(language: LanguageDetail) -> impl IntoView {
                         busy.set(false);
                     }); }
                 }
-            }><label for="recipe-editor">"GENERATION RECIPE / JSON"</label><textarea id="recipe-editor" class="mono recipe-editor" rows="20" required prop:value=move || source.get() on:input=move |event| source.set(event_target_value(&event))></textarea><p class="field-help">"Advanced editing: a reroll counter such as \"lexeme/n.water\": 1 changes that root and its dependent history. Global grammar choices are addressed independently."</p><button class="button" type="submit" disabled=move || busy.get() || job.get().is_some()>"Generate a new draft →"</button></form>
+            }><label for="recipe-editor">"GENERATION RECIPE / JSON"</label><textarea id="recipe-editor" class="mono recipe-editor" rows="20" required disabled=move || busy.get() || job.get().is_some() prop:value=move || source.get() on:input=move |event| source.set(event_target_value(&event))></textarea><p class="field-help">"Advanced editing: a reroll counter such as \"lexeme/n.water\": 1 changes that root and its dependent history. Global grammar choices are addressed independently."</p><button class="button" type="submit" disabled=move || busy.get() || job.get().is_some()>"Generate a new draft →"</button></form>
             <aside class="notice"><strong>"Importing and preserving work"</strong><p>"A recipe recreates the generated state. Keep the complete package as well: it includes every stored paradigm and history. The import API verifies its version, contents and checksum."</p></aside>
         </div>
     }
